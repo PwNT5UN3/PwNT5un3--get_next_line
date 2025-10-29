@@ -6,169 +6,141 @@
 /*   By: mawelsch <mawelsch@student.42heilbronn.    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/10/18 16:48:11 by mawelsch          #+#    #+#             */
-/*   Updated: 2025/10/22 16:12:41 by mawelsch         ###   ########.fr       */
+/*   Updated: 2025/10/27 16:26:30 by mawelsch         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
 #include <unistd.h>
 #include <stdlib.h>
-#include <stdio.h>
-#include <fcntl.h>
 #ifndef BUFFER_SIZE
-# define BUFFER_SIZE 1000000000
+# define BUFFER_SIZE 2
 #endif
 
-int	ft_strlen(const char *str)
+void	ft_bzero(void *s, size_t n);
+int		ft_strlen(const char *str);
+char	*ft_strjoin(char const *s1, char const *s2);
+char	*ft_strchr(const char *s, int c);
+
+void	get_new_left(int index_2, char *left, int index, char *total)
 {
-	int	index;
+	int	index_left;
 
-	index = 0;
-	while (str[index] != '\0')
-		index++;
-	return (index);
-}
-
-char	*ft_strjoin(char const *s1, char const *s2)
-{
-	int		len;
-	char	*address;
-	char	*start;
-
-	len = ft_strlen(s1) + ft_strlen(s2) + 1;
-	address = malloc(len);
-	if (address == NULL)
-		return (NULL);
-	start = address;
-	while (*s1 != '\0')
+	index_left = 0;
+	while (total[index_2] != '\0')
+		index_2++;
+	if (index_2 > (index + 1) && total[index] != '\0')
 	{
-		*address = *s1;
-		address++;
-		s1++;
-	}
-	while (*s2 != '\0')
-	{
-		*address = *s2;
-		address++;
-		s2++;
-	}
-	*address = '\0';
-	return (start);
-}
-
-char	*ft_strchr(const char *s, int c)
-{
-	void			*tmp;
-	unsigned char	target;
-
-	target = c;
-	while (*s != '\0')
-	{
-		if (*s == target)
+		while (index_2 >= ++index)
 		{
-			tmp = (void *)s;
-			return (tmp);
+			left[index_left] = total[index];
+			index_left++;
 		}
-		s++;
 	}
-	if (*s == target)
-	{
-		tmp = (void *)s;
-		return (tmp);
-	}
-	return (NULL);
+	else
+		ft_bzero(left, BUFFER_SIZE + 1);
 }
 
-char	*end_nl(char *total, char **left, char *buffer)
+char	*end_nl(char *total, char *left, char *buffer)
 {
 	int		index;
 	int		index_2;
 	char	*retstr;
-	int		index_left;
 
 	index = 0;
 	index_2 = 0;
-	index_left = 0;
-	while (total[index] != '\n')
+	while (total[index] != '\n' && total[index] != '\0')
 		index++;
 	retstr = malloc(index + 2);
 	if (retstr == NULL)
-		return (NULL);
+	{
+		ft_bzero(left, BUFFER_SIZE + 1);
+		return (free(buffer), free(total), NULL);
+	}
 	while (index_2 <= index)
 	{
 		retstr[index_2] = total[index_2];
 		index_2++;
 	}
 	retstr[index_2] = '\0';
-	free(*left);
-	while (total[index_2] != '\0')
-		index_2++;
-	if (index_2 > (index + 1))
-	{
-		*left = malloc(index_2 - index);
-		if (*left == NULL)
-			return (NULL);
-		while (index_2 >= ++index)
-		{
-			*left[index_left] = total[index];
-			index_left++;
-		}
-	}
-	else
-		*left = NULL;
+	get_new_left(index_2, left, index, total);
 	free(total);
+	total = NULL;
 	free(buffer);
 	return (retstr);
+}
+
+char	*book_burner(int bytes_read, char *buffer, char *left, char *total)
+{
+	char	*tmp;
+
+	if (bytes_read == -1)
+	{
+		ft_bzero(left, BUFFER_SIZE + 1);
+		free(buffer);
+		free(total);
+		return (NULL);
+	}
+	if (bytes_read == 0)
+	{
+		free(buffer);
+		if (total[0] != '\0')
+			tmp = ft_strjoin("", total);
+		else
+			tmp = NULL;
+		free(total);
+		ft_bzero(left, BUFFER_SIZE + 1);
+		return (tmp);
+	}
+	return (free(total), free(buffer), NULL);
+}
+
+char	*librarian(int fd, char *buffer, char *left, char *total)
+{
+	int		bytes_read;
+	char	*tmp;
+
+	bytes_read = read(fd, buffer, BUFFER_SIZE);
+	if (bytes_read == -1 || bytes_read == 0)
+		return (book_burner(bytes_read, buffer, left, total));
+	buffer[bytes_read] = '\0';
+	if (total != NULL)
+	{
+		tmp = ft_strjoin(total, buffer);
+		free(total);
+		if (tmp == NULL)
+			return (free(buffer), NULL);
+		total = tmp;
+	}
+	else
+		total = ft_strjoin("", buffer);
+	if (ft_strchr(buffer, '\n') != NULL)
+		return (end_nl(total, left, buffer));
+	return (librarian(fd, buffer, left, total));
 }
 
 char	*get_next_line(int fd)
 {
 	char		*buffer;
-	int			bytes_read;
 	char		*total;
-	static char	*left = NULL;
-	char		*tmp;
+	static char	left[BUFFER_SIZE + 1];
 
-	total = left;
+	if (fd < 0 || BUFFER_SIZE <= 0)
+	{
+		ft_bzero(left, BUFFER_SIZE + 1);
+		return (NULL);
+	}
+	total = ft_strjoin("", left);
+	if (total == NULL)
+		return (NULL);
 	buffer = malloc(BUFFER_SIZE + 1);
 	if (buffer == NULL)
+	{
+		ft_bzero(left, BUFFER_SIZE + 1);
+		free(total);
 		return (NULL);
+	}
 	if (total != NULL)
 		if (ft_strchr(total, '\n') != NULL)
-			return (end_nl(total, &left, buffer));
-	while (1)
-	{
-		bytes_read = read(fd, buffer, BUFFER_SIZE);
-		if (bytes_read == -1)
-		{
-			free(buffer);
-			return (NULL);
-		}
-		if (bytes_read == 0)
-			break ;
-		buffer[bytes_read] = '\0';
-		if (total != NULL)
-		{
-			tmp = ft_strjoin(total, buffer);
-			if (tmp == NULL)
-				return (NULL);
-			free(total);
-			total = tmp;
-		}
-		else
-			total = ft_strjoin("", buffer);
-		if (ft_strchr(buffer, '\n') != NULL)
-			return (end_nl(total, &left, buffer));
-	}
-	free(buffer);
-	return (total);
+			return (end_nl(total, left, buffer));
+	return (librarian(fd, buffer, left, total));
 }
-
-// int	main(void)
-// {
-// 	int	fd;
-
-// 	fd = open("new.txt", O_RDONLY);
-// 	printf("%s", get_next_line(fd));
-// 	printf("\n%s", get_next_line(fd));
-// 	printf("%s", get_next_line(fd));
-// }
